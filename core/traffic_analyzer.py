@@ -170,14 +170,22 @@ class TrafficAnalyzer:
         stopped = [t for t in vehicle_tracks
                    if t.is_stopped and t.wait_time > config.ACCIDENT_STOP_THRESHOLD * 2]
         
-        # Check 2: Bounding box overlap (collision)
+        # Check 2: Bounding box overlap AND Centroid Distance (Real collision)
         for i, t1 in enumerate(vehicle_tracks):
             for t2 in vehicle_tracks[i+1:]:
                 iou = self._compute_iou(
                     (t1.x1, t1.y1, t1.x2, t1.y2),
                     (t2.x1, t2.y1, t2.x2, t2.y2)
                 )
-                if iou > config.ACCIDENT_OVERLAP_IOU:
+                
+                # In 2D perspective, boxes overlap easily. 
+                # To be a real crash, their physical center-points must be abnormally close.
+                dx = t1.cx - t2.cx
+                dy = t1.cy - t2.cy
+                centroid_dist = (dx**2 + dy**2) ** 0.5
+                
+                # Flag accident IF highly overlapped AND centroids are packed < 50px AND vehicles have violently stopped
+                if iou > 0.4 and centroid_dist < 50 and t1.is_stopped and t2.is_stopped:
                     self.total_accidents += 1
                     return Alert(
                         alert_type="accident",

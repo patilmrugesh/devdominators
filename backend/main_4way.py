@@ -77,3 +77,9 @@ async def api_frame():
         jpg = processor.get_jpeg_frame()
         if jpg: return Response(content=jpg, media_type="image/jpeg")
     return Response(status_code=204)
+@app.get("/api/incidents")
+async def api_incidents():
+    """Returns the latest captured incident snapshots (Crowd, Ambulance, Accident, Parking)."""
+    if processor:
+        return JSONResponse(processor.get_incident_history())
+    return JSONResponse([])

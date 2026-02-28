@@ -54,6 +54,9 @@ class VideoProcessor4Way:
         self.latest_metrics: Dict = {}
         self.latest_alerts:  List = []
         self.latest_signals: Dict = {}
+        self.latest_signals: Dict = {}
+        self.incident_history: List[Dict] = []
+        self._last_incident_time: float = 0.0
         self._on_state: Optional[Callable] = None
 
     def _resolve_video(self, path=None) -> str:
@@ -120,7 +123,7 @@ class VideoProcessor4Way:
                 self.latest_metrics = self.analyzer.metrics
                 self.latest_alerts  = [a.to_dict() for a in self.analyzer.alerts[-5:]]
                 self.latest_signals = self.optimizer.get_metrics()
-            
+                
             annotated = composite.copy()
             self.lane_mgr.draw_lanes(annotated)
             if current_detections: self.detector.draw(annotated, current_detections)
@@ -130,6 +133,56 @@ class VideoProcessor4Way:
             self.draw_quadrant_signals(annotated, self.optimizer.signals, qw, qh)
             
             self.latest_frame = annotated
+            
+            # ── Incident Detection Pipeline ──
+            now = time.time()
+            if now - self._last_incident_time > 10.0:  # 10s cooldown between captured incidents
+                incident_type = None
+                desc = None
+                
+                person_count = sum(1 for t in current_tracks if t.is_person)
+                
+                # Check for critical alerts from the analyzer
+                critical_alerts = [a for a in self.latest_alerts if a['severity'] == 'critical']
+                
+                if critical_alerts:
+                    for a in critical_alerts:
+                        if "COLLISION" in a["message"]:
+                            incident_type = "accident"
+                            desc = f"Collision anomaly detected in {a['lane'] or 'intersection'}."
+                            break
+                        elif "AMBULANCE" in a["message"]:
+                            incident_type = "ambulance"
+                            desc = f"Ambulance detected passing through {a['lane']} lane."
+                            break
+                
+                # Check for Crowd
+                if not incident_type and person_count > 12:
+                    incident_type = "crowd"
+                    desc = f"Large crowd of {person_count} pedestrians crossing."
+                
+                # Check for Suspicious Stalls
+                if not incident_type:
+                    for lane, stats in current_lane_stats.items():
+                        if stats.max_wait_time > 120.0: # 2 minutes
+                            incident_type = "parking"
+                            desc = f"Potential stalled or illegally parked vehicle in {lane} lane."
+                            break
+                
+                if incident_type:
+                    _, buf = cv2.imencode(".jpg", annotated, [cv2.IMWRITE_JPEG_QUALITY, 85])
+                    with self.state_lock:
+                        self.incident_history.insert(0, {
+                            "type": incident_type,
+                            "description": desc,
+                            "timestamp": now,
+                            "frame_b64": base64.b64encode(buf.tobytes()).decode("utf-8")
+                        })
+                        # Keep only the last 15 incidents in memory
+                        if len(self.incident_history) > 15:
+                            self.incident_history.pop()
+                    self._last_incident_time = now
+            # ─────────────────────────────────
             
             if self._on_state:
                 try:
@@ -178,3 +231,7 @@ class VideoProcessor4Way:
             "signals": self.latest_signals, "chart": self.analyzer.get_chart_data(),
             "frame_b64": self.get_b64_frame(),
         }
+
+    def get_incident_history(self) -> List[Dict]:
+        with self.state_lock:
+            return list(self.incident_history)

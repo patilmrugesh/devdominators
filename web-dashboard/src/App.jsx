@@ -5,8 +5,10 @@ import SignalPanel from './components/SignalPanel';
 import DetectionStats from './components/DetectionStats';
 import LaneAnalytics from './components/LaneAnalytics';
 import Alerts from './components/Alerts';
+import IncidentMonitor from './components/IncidentMonitor';
 
 function App() {
+  const [currentView, setCurrentView] = useState('dashboard');
   const [state, setState] = useState({
     metrics: {},
     signals: {},
@@ -73,19 +75,27 @@ function App() {
         metrics={state.metrics}
         uptime={uptime}
         isConnected={isConnected}
+        currentView={currentView}
+        setCurrentView={setCurrentView}
       />
 
       <main className="main-container">
-        <section className="video-section">
-          <VideoPlayer frameB64={state.frame_b64} fps={state.metrics?.current_fps} />
-        </section>
+        {currentView === 'dashboard' ? (
+          <>
+            <section className="video-section">
+              <VideoPlayer frameB64={state.frame_b64} fps={state.metrics?.current_fps} />
+            </section>
 
-        <aside className="sidebar">
-          <SignalPanel signals={state.signals} laneStats={state.metrics?.lane_stats} />
-          <DetectionStats vehicleTypes={state.metrics?.vehicle_types} />
-          <LaneAnalytics laneStats={state.metrics?.lane_stats} />
-          <Alerts alerts={state.alerts} />
-        </aside>
+            <aside className="sidebar">
+              <SignalPanel signals={state.signals} laneStats={state.metrics?.lane_stats} />
+              <DetectionStats vehicleTypes={state.metrics?.vehicle_types} />
+              <LaneAnalytics laneStats={state.metrics?.lane_stats} />
+              <Alerts alerts={state.alerts} />
+            </aside>
+          </>
+        ) : (
+          <IncidentMonitor />
+        )}
       </main>
     </>
   );

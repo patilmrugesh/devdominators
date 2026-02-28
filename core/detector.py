@@ -115,6 +115,35 @@ class Detector:
             is_person    = cls_id == 0
             is_ambulance = any(kw in label.lower() for kw in config.AMBULANCE_CLASS_KEYWORDS)
             
+            # ── Hackathon Ambulance Override Heuristic ──
+            # YOLOv8n struggles with ambulances. If it's a large vehicle, scan its pixels.
+            if is_vehicle and not is_ambulance and label in ["truck", "bus", "car"]:
+                # Crop the bounding box from the frame
+                crop = frame[y1:y2, x1:x2]
+                if crop.size > 0:
+                    # Convert to HSV to look for bright white bodies & intense red lights
+                    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+                    
+                    # White mask (low saturation, high value)
+                    lower_white = np.array([0, 0, 200])
+                    upper_white = np.array([180, 40, 255])
+                    mask_white = cv2.inRange(hsv, lower_white, upper_white)
+                    
+                    # Red mask (flashing lights usually stand out in hue 0-10 or 160-180 with high saturation/value)
+                    mask_red1 = cv2.inRange(hsv, np.array([0, 150, 150]), np.array([10, 255, 255]))
+                    mask_red2 = cv2.inRange(hsv, np.array([160, 150, 150]), np.array([180, 255, 255]))
+                    mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+                    
+                    white_ratio = cv2.countNonZero(mask_white) / (crop.shape[0] * crop.shape[1])
+                    red_ratio = cv2.countNonZero(mask_red) / (crop.shape[0] * crop.shape[1])
+                    
+                    # If it's predominantly white (>20%) and has sharp red peaks (>1%), override it!
+                    if white_ratio > 0.20 and red_ratio > 0.01:
+                        is_ambulance = True
+                        label = "ambulance"
+                        
+            # ──────────────────────────────────────────────
+            
             # Filter: only keep relevant classes
             if not (is_vehicle or is_person or is_ambulance):
                 continue

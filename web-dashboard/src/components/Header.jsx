@@ -1,4 +1,4 @@
-export default function Header({ metrics, uptime, isConnected }) {
+export default function Header({ metrics, uptime, isConnected, currentView, setCurrentView }) {
     const fps = parseFloat(metrics?.fps || metrics?.current_fps || 0).toFixed(1);
     const veh = metrics?.total_vehicles || metrics?.vehicle_count || 0;
 
@@ -14,6 +14,31 @@ export default function Header({ metrics, uptime, isConnected }) {
                         YOLOv8 Detection &bull; Adaptive Signal Control
                     </span>
                 </div>
+            </div>
+
+            <div style={{ display: 'flex', gap: '8px', background: 'rgba(255,255,255,0.05)', padding: '4px', borderRadius: '12px' }}>
+                <button
+                    onClick={() => setCurrentView('dashboard')}
+                    style={{
+                        background: currentView === 'dashboard' ? 'var(--blue)' : 'transparent',
+                        color: currentView === 'dashboard' ? '#fff' : 'var(--muted)',
+                        border: 'none', padding: '8px 16px', borderRadius: '8px',
+                        fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}>
+                    🚦 Live Dashboard
+                </button>
+                <button
+                    onClick={() => setCurrentView('incidents')}
+                    style={{
+                        background: currentView === 'incidents' ? 'var(--red)' : 'transparent',
+                        color: currentView === 'incidents' ? '#fff' : 'var(--muted)',
+                        border: 'none', padding: '8px 16px', borderRadius: '8px',
+                        fontSize: '13px', fontWeight: '600', cursor: 'pointer',
+                        transition: 'all 0.2s'
+                    }}>
+                    ⚠️ Incident Feed
+                </button>
             </div>
 
             <div style={{ display: 'flex', gap: '24px', alignItems: 'center' }}>
