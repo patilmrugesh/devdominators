@@ -142,8 +142,13 @@ class LaneManager:
             
             if track.is_vehicle:
                 lane_vehicles[lane].append(track)
-                bbox_area = track.w * track.h
-                lane_bbox_area[lane] += bbox_area
+                
+                # Fetch weight multiplier from config based on specific vehicle type
+                weight = getattr(config, 'VEHICLE_WEIGHTS', {}).get(track.label, 1.0)
+                
+                # Multiply geometrical density physically occupied by the severity weight of the vehicle
+                weighted_bbox_area = (track.w * track.h) * weight
+                lane_bbox_area[lane] += weighted_bbox_area
                 
                 if track.is_stopped:
                     lane_stopped[lane] += 1

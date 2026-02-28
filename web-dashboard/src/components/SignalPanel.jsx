@@ -1,6 +1,6 @@
 export default function SignalPanel({ signals, laneStats }) {
     const data = signals?.signals || {};
-    const lanes = ['North', 'South'];
+    const lanes = ['North', 'South', 'East', 'West'];
 
     return (
         <div className="glass-panel" style={{ padding: '16px' }}>
@@ -84,12 +84,6 @@ export default function SignalPanel({ signals, laneStats }) {
                                 </div>
                             </div>
 
-                            {index === 0 && (
-                                <div style={{ position: 'relative', textAlign: 'center', margin: '6px 0', color: 'var(--muted)', fontSize: '9px', letterSpacing: '2px' }}>
-                                    <div style={{ position: 'absolute', top: '50%', left: 0, right: 0, height: '1px', background: 'var(--border)' }} />
-                                    <span style={{ background: 'var(--card-bg)', padding: '0 8px', position: 'relative' }}>VS</span>
-                                </div>
-                            )}
                         </div>
                     );
                 })}

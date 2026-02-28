@@ -37,6 +37,18 @@ VEHICLE_CLASSES = {
 }
 AMBULANCE_CLASS_KEYWORDS = ["ambulance"]  # substring match in class name
 
+# ─── Vehicle Density Weights ─────────────────────────────────────────────────
+# Heavy vehicles take longer to accelerate and clear intersections.
+# We multiply their geometric bbox density by these factors to ensure fairness.
+VEHICLE_WEIGHTS = {
+    "motorcycle": 0.5,
+    "car":        1.0,
+    "bus":        3.0,
+    "truck":      2.5,
+    "person":     1.0,  # Irrelevant, pedestrians don't trigger vehicle logic
+    "ambulance":  0.0,  # Ambulances have a flat emergency override anyway
+}
+
 # ─── Lane Polygon Definitions (normalized 0–1 coordinates) ───────────────────
 # These define 4 virtual lanes at a 4-way intersection.
 # Format: list of (x_norm, y_norm) points for each lane quadrant.

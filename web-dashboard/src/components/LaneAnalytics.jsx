@@ -1,5 +1,5 @@
 export default function LaneAnalytics({ laneStats = {} }) {
-    const lanes = ['North', 'South'];
+    const lanes = ['North', 'South', 'East', 'West'];
 
     return (
         <div className="glass-panel" style={{ padding: '16px' }}>

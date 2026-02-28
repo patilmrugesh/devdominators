@@ -57,8 +57,9 @@ class SignalOptimizer:
     PHASE_ORDER = ["North", "South", "East", "West"]
     
     def __init__(self):
+        now = time.time()
         self.signals: Dict[str, LaneSignal] = {
-            name: LaneSignal(name=name) for name in self.PHASE_ORDER
+            name: LaneSignal(name=name, last_green=now) for name in self.PHASE_ORDER
         }
         
         # Current phase
@@ -182,7 +183,7 @@ class SignalOptimizer:
         for name, sig in self.signals.items():
             if name == self.current_lane:
                 continue
-            wait = now - sig.last_green if sig.last_green > 0 else 0
+            wait = now - sig.last_green
             if wait > config.MAX_WAIT_TIME and wait > longest_wait:
                 fairness_candidate = name
                 longest_wait = wait
