@@ -1,0 +1,945 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Traffic Control System</title>
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;900&family=JetBrains+Mono:wght@400;600;700&display=swap"
+    rel="stylesheet">
+  <style>
+    :root {
+      --bg: #060a10;
+      --card: #0c1220;
+      --border: #18273e;
+      --green: #00e676;
+      --yellow: #ffd600;
+      --red: #ff1744;
+      --blue: #2979ff;
+      --text: #dce8f5;
+      --muted: #4e6680;
+      --north-color: #2979ff;
+      --south-color: #00e676;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Inter', sans-serif;
+      height: 100vh;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* ── HEADER ── */
+    header {
+      background: linear-gradient(90deg, #0c1220, #0a1628);
+      border-bottom: 1px solid var(--border);
+      padding: 8px 18px;
+      display: flex;
+      align-items: center;
+      gap: 18px;
+      flex-shrink: 0;
+      height: 52px;
+    }
+
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .logo-icon {
+      font-size: 20px;
+    }
+
+    .logo-text {
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: .3px;
+    }
+
+    .logo-sub {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 1px;
+    }
+
+    .hstats {
+      display: flex;
+      gap: 22px;
+      margin-left: auto;
+      align-items: center;
+    }
+
+    .hstat-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 17px;
+      font-weight: 700;
+    }
+
+    .hstat-lbl {
+      font-size: 8px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 1.2px;
+    }
+
+    .live-pill {
+      background: rgba(0, 230, 118, .12);
+      border: 1px solid var(--green);
+      border-radius: 20px;
+      padding: 4px 11px;
+      font-size: 10px;
+      color: var(--green);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+
+    .pulse {
+      width: 6px;
+      height: 6px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse 1.2s infinite;
+    }
+
+    @keyframes pulse {
+
+      0%,
+      100% {
+        opacity: 1
+      }
+
+      50% {
+        opacity: .2
+      }
+    }
+
+    /* ── MAIN ── */
+    .main {
+      flex: 1;
+      display: grid;
+      grid-template-columns: 1fr 300px;
+      overflow: hidden;
+    }
+
+    /* ── VIDEO SIDE ── */
+    .video-wrap {
+      position: relative;
+      background: #000;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      overflow: hidden;
+    }
+
+    #videoFeed {
+      width: 100%;
+      height: 100%;
+      object-fit: contain;
+      display: none;
+    }
+
+    .cam-badge {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(6, 10, 16, .75);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 10px;
+      color: var(--muted);
+      display: flex;
+      gap: 6px;
+    }
+
+    .cam-badge span {
+      color: var(--green);
+      font-family: monospace;
+      font-weight: 700;
+    }
+
+    .legend {
+      position: absolute;
+      bottom: 10px;
+      left: 10px;
+      background: rgba(6, 10, 16, .78);
+      border: 1px solid var(--border);
+      backdrop-filter: blur(4px);
+      border-radius: 6px;
+      padding: 5px 10px;
+      display: flex;
+      gap: 12px;
+    }
+
+    .leg {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+      font-size: 9px;
+    }
+
+    .leg-sq {
+      width: 9px;
+      height: 9px;
+      border-radius: 2px;
+    }
+
+    .no-feed {
+      position: absolute;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 10px;
+      color: var(--muted);
+    }
+
+    .no-feed-icon {
+      font-size: 44px;
+    }
+
+    /* ── RIGHT PANEL ── */
+    .panel {
+      background: var(--card);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+      overflow-x: hidden;
+    }
+
+    .panel::-webkit-scrollbar {
+      width: 3px;
+    }
+
+    .panel::-webkit-scrollbar-thumb {
+      background: var(--border);
+      border-radius: 2px;
+    }
+
+    .sec-title {
+      padding: 10px 14px 7px;
+      font-size: 9px;
+      font-weight: 700;
+      letter-spacing: 2px;
+      color: var(--muted);
+      text-transform: uppercase;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .sec-dot {
+      width: 5px;
+      height: 5px;
+      border-radius: 50%;
+    }
+
+    /* ── SIGNAL PANEL ── */
+    .signal-panel {
+      padding: 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+
+    .signal-box {
+      background: #09111e;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 12px 14px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      transition: border-color .3s, box-shadow .3s;
+    }
+
+    .signal-box.green-active {
+      border-color: var(--green);
+      box-shadow: 0 0 16px rgba(0, 230, 118, .18);
+    }
+
+    .signal-box.yellow-active {
+      border-color: var(--yellow);
+      box-shadow: 0 0 16px rgba(255, 214, 0, .18);
+    }
+
+    .signal-box.red-active {
+      border-color: var(--red);
+      box-shadow: 0 0 12px rgba(255, 23, 68, .10);
+    }
+
+    /* Traffic light bulbs */
+    .light-pole {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+
+    .bulb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      transition: opacity .3s, box-shadow .3s;
+    }
+
+    .bulb.r-on {
+      background: var(--red);
+      box-shadow: 0 0 9px var(--red);
+      opacity: 1;
+    }
+
+    .bulb.y-on {
+      background: var(--yellow);
+      box-shadow: 0 0 9px var(--yellow);
+      opacity: 1;
+    }
+
+    .bulb.g-on {
+      background: var(--green);
+      box-shadow: 0 0 9px var(--green);
+      opacity: 1;
+    }
+
+    .bulb.r-off {
+      background: #3a1515;
+      opacity: .3;
+    }
+
+    .bulb.y-off {
+      background: #3a3215;
+      opacity: .3;
+    }
+
+    .bulb.g-off {
+      background: #0d2e1a;
+      opacity: .3;
+    }
+
+    /* Countdown ring */
+    .ring-wrap {
+      position: relative;
+      width: 58px;
+      height: 58px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+
+    .ring-svg {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transform: rotate(-90deg);
+    }
+
+    .ring-track {
+      stroke: #18273e;
+      fill: none;
+      stroke-width: 4;
+    }
+
+    .ring-fill {
+      fill: none;
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke .4s;
+    }
+
+    .ring-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 16px;
+      font-weight: 800;
+      z-index: 1;
+      line-height: 1;
+    }
+
+    .ring-unit {
+      font-size: 9px;
+      color: var(--muted);
+      text-align: center;
+      margin-top: 1px;
+    }
+
+    /* Signal info */
+    .sig-info {
+      flex: 1;
+    }
+
+    .sig-name {
+      font-size: 15px;
+      font-weight: 800;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 3px;
+    }
+
+    .sig-status {
+      font-size: 10px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .sig-veh {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+      color: var(--muted);
+      margin-top: 4px;
+    }
+
+    /* divider */
+    .lane-divider {
+      position: relative;
+      text-align: center;
+      margin: 2px 0;
+      color: var(--muted);
+      font-size: 9px;
+      letter-spacing: 2px;
+    }
+
+    .lane-divider::before {
+      content: '';
+      position: absolute;
+      top: 50%;
+      left: 0;
+      right: 0;
+      height: 1px;
+      background: var(--border);
+      z-index: 0;
+    }
+
+    .lane-divider span {
+      background: var(--card);
+      padding: 0 8px;
+      position: relative;
+      z-index: 1;
+    }
+
+    /* ── STATS ── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 6px;
+      padding: 10px 12px;
+    }
+
+    .stat-card {
+      background: #09111e;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 9px 11px;
+    }
+
+    .sc-val {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 18px;
+      font-weight: 700;
+    }
+
+    .sc-lbl {
+      font-size: 9px;
+      color: var(--muted);
+      margin-top: 2px;
+      text-transform: uppercase;
+      letter-spacing: .8px;
+    }
+
+    /* Lane bars */
+    .lane-bars {
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .lbar {}
+
+    .lbar-top {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 4px;
+    }
+
+    .lbar-name {
+      font-size: 10px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .lbar-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+    }
+
+    .lbar-cnt {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11px;
+    }
+
+    .bar-bg {
+      background: #18273e;
+      border-radius: 4px;
+      height: 5px;
+      overflow: hidden;
+    }
+
+    .bar-fill {
+      height: 100%;
+      border-radius: 4px;
+      transition: width .5s ease;
+    }
+
+    .lbar-meta {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 3px;
+      font-size: 9px;
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+    }
+
+    /* Alerts */
+    .alerts {
+      padding: 6px 12px 10px;
+    }
+
+    .alert-item {
+      border-radius: 6px;
+      padding: 6px 9px;
+      margin-bottom: 5px;
+      font-size: 10px;
+      display: flex;
+      gap: 6px;
+      align-items: flex-start;
+      animation: fadeIn .35s ease;
+    }
+
+    @keyframes fadeIn {
+      from {
+        opacity: 0;
+        transform: translateY(-3px)
+      }
+
+      to {
+        opacity: 1;
+        transform: none
+      }
+    }
+
+    .a-crit {
+      background: rgba(255, 23, 68, .13);
+      border-left: 3px solid var(--red);
+    }
+
+    .a-high {
+      background: rgba(255, 145, 0, .13);
+      border-left: 3px solid #ff9100;
+    }
+
+    .a-med {
+      background: rgba(255, 214, 0, .11);
+      border-left: 3px solid var(--yellow);
+    }
+
+    .a-low {
+      background: rgba(41, 121, 255, .11);
+      border-left: 3px solid var(--blue);
+    }
+
+    .no-alert {
+      color: var(--muted);
+      font-size: 10px;
+      padding: 6px;
+      text-align: center;
+    }
+  </style>
+</head>
+
+<body>
+
+  <header>
+    <div class="logo">
+      <span class="logo-icon">🚦</span>
+      <div>
+        <div class="logo-text">AI Traffic Control System</div>
+        <div class="logo-sub">YOLOv8 Detection &bull; Adaptive Signal Control</div>
+      </div>
+    </div>
+    <div class="hstats">
+      <div style="text-align:center">
+        <div class="hstat-val" id="hFps" style="color:var(--green)">--</div>
+        <div class="hstat-lbl">FPS</div>
+      </div>
+      <div style="text-align:center">
+        <div class="hstat-val" id="hVeh" style="color:var(--blue)">0</div>
+        <div class="hstat-lbl">Vehicles</div>
+      </div>
+      <div style="text-align:center">
+        <div class="hstat-val" id="hUptime" style="color:#aa00ff">00:00</div>
+        <div class="hstat-lbl">Uptime</div>
+      </div>
+      <div class="live-pill">
+        <div class="pulse"></div>LIVE
+      </div>
+    </div>
+  </header>
+
+  <div class="main">
+
+    <!-- ── VIDEO ── -->
+    <div class="video-wrap">
+      <img id="videoFeed" alt="Traffic Camera">
+      <div class="no-feed" id="noFeed">
+        <div class="no-feed-icon">📷</div>
+        <p style="font-size:12px">Waiting for video stream…</p>
+      </div>
+      <div class="cam-badge">
+        LIVE — CAMERA &nbsp;|&nbsp; <span id="camFps">--</span> FPS
+      </div>
+      <div class="legend">
+        <div class="leg">
+          <div class="leg-sq" style="background:#00e676"></div>Car
+        </div>
+        <div class="leg">
+          <div class="leg-sq" style="background:#ff9100"></div>Motorcycle
+        </div>
+        <div class="leg">
+          <div class="leg-sq" style="background:#2979ff"></div>Bus
+        </div>
+        <div class="leg">
+          <div class="leg-sq" style="background:#aa00ff"></div>Truck
+        </div>
+        <div class="leg">
+          <div class="leg-sq" style="background:#ffea00"></div>Person
+        </div>
+        <div class="leg">
+          <div class="leg-sq" style="background:#ff1744"></div>Ambulance
+        </div>
+      </div>
+    </div>
+
+    <!-- ── RIGHT PANEL ── -->
+    <div class="panel">
+
+      <!-- SIGNAL CONTROL -->
+      <div class="sec-title">
+        <div class="sec-dot" style="background:var(--green)"></div>
+        Signal Control
+      </div>
+      <div class="signal-panel">
+
+        <!-- North -->
+        <div class="signal-box" id="box-North">
+          <div class="light-pole">
+            <div class="bulb r-off" id="r-North"></div>
+            <div class="bulb y-off" id="y-North"></div>
+            <div class="bulb g-off" id="g-North"></div>
+          </div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" width="58" height="58" viewBox="0 0 58 58">
+              <circle class="ring-track" cx="29" cy="29" r="25" />
+              <circle class="ring-fill" id="ring-North" cx="29" cy="29" r="25" stroke="#00e676" stroke-dasharray="157"
+                stroke-dashoffset="157" />
+            </svg>
+            <div>
+              <div class="ring-val" id="timer-North" style="color:var(--muted);text-align:center">--</div>
+              <div class="ring-unit">sec</div>
+            </div>
+          </div>
+          <div class="sig-info">
+            <div class="sig-name" style="color:var(--north-color)">North</div>
+            <div class="sig-status" id="state-North" style="color:var(--muted)">RED</div>
+            <div class="sig-veh" id="veh-North">0 vehicles</div>
+          </div>
+        </div>
+
+        <div class="lane-divider"><span>VS</span></div>
+
+        <!-- South -->
+        <div class="signal-box green-active" id="box-South">
+          <div class="light-pole">
+            <div class="bulb r-off" id="r-South"></div>
+            <div class="bulb y-off" id="y-South"></div>
+            <div class="bulb g-on" id="g-South"></div>
+          </div>
+          <div class="ring-wrap">
+            <svg class="ring-svg" width="58" height="58" viewBox="0 0 58 58">
+              <circle class="ring-track" cx="29" cy="29" r="25" />
+              <circle class="ring-fill" id="ring-South" cx="29" cy="29" r="25" stroke="#00e676" stroke-dasharray="157"
+                stroke-dashoffset="78.5" />
+            </svg>
+            <div>
+              <div class="ring-val" id="timer-South" style="color:var(--green);text-align:center">5</div>
+              <div class="ring-unit">sec</div>
+            </div>
+          </div>
+          <div class="sig-info">
+            <div class="sig-name" style="color:var(--south-color)">South</div>
+            <div class="sig-status" id="state-South" style="color:var(--green)">GREEN</div>
+            <div class="sig-veh" id="veh-South">0 vehicles</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- STATS -->
+      <div class="sec-title">
+        <div class="sec-dot" style="background:var(--blue)"></div>
+        Detection Stats
+      </div>
+      <div class="stats-grid">
+        <div class="stat-card">
+          <div class="sc-val" id="sc-cars" style="color:var(--green)">0</div>
+          <div class="sc-lbl">🟢 Cars</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="sc-trucks" style="color:#aa00ff">0</div>
+          <div class="sc-lbl">🟣 Trucks</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="sc-motos" style="color:#ff9100">0</div>
+          <div class="sc-lbl">🟠 Motorcycles</div>
+        </div>
+        <div class="stat-card">
+          <div class="sc-val" id="sc-buses" style="color:#2979ff">0</div>
+          <div class="sc-lbl">🔵 Buses</div>
+        </div>
+      </div>
+
+      <!-- LANE ANALYTICS -->
+      <div class="sec-title">
+        <div class="sec-dot" style="background:#aa00ff"></div>
+        Lane Analytics
+      </div>
+      <div class="lane-bars">
+        <div class="lbar">
+          <div class="lbar-top">
+            <div class="lbar-name">
+              <div class="lbar-dot" style="background:var(--north-color)"></div>
+              <span style="color:var(--north-color)">North</span>
+            </div>
+            <div class="lbar-cnt" id="lb-cnt-North">0 veh</div>
+          </div>
+          <div class="bar-bg">
+            <div class="bar-fill" id="lb-bar-North" style="width:0%;background:var(--north-color)"></div>
+          </div>
+          <div class="lbar-meta">
+            <span id="lb-dens-North">Density: 0%</span>
+            <span id="lb-q-North">Queue: 0</span>
+            <span id="lb-wait-North">Wait: 0s</span>
+          </div>
+        </div>
+        <div class="lbar">
+          <div class="lbar-top">
+            <div class="lbar-name">
+              <div class="lbar-dot" style="background:var(--south-color)"></div>
+              <span style="color:var(--south-color)">South</span>
+            </div>
+            <div class="lbar-cnt" id="lb-cnt-South">0 veh</div>
+          </div>
+          <div class="bar-bg">
+            <div class="bar-fill" id="lb-bar-South" style="width:0%;background:var(--south-color)"></div>
+          </div>
+          <div class="lbar-meta">
+            <span id="lb-dens-South">Density: 0%</span>
+            <span id="lb-q-South">Queue: 0</span>
+            <span id="lb-wait-South">Wait: 0s</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- ALERTS -->
+      <div class="sec-title">
+        <div class="sec-dot" style="background:var(--red)"></div>
+        Alerts
+      </div>
+      <div class="alerts" id="alerts">
+        <div class="no-alert">✓ No active alerts</div>
+      </div>
+
+    </div>
+  </div><!-- main -->
+
+  <script>
+    // ── Helpers ──────────────────────────────────────────
+    const CIRC = 2 * Math.PI * 25; // r=25
+
+    let startTime = Date.now();
+
+    function updateSignal(lane, state, timeLeft, vehCount) {
+      const box = document.getElementById("box-" + lane);
+      const bR = document.getElementById("r-" + lane);
+      const bY = document.getElementById("y-" + lane);
+      const bG = document.getElementById("g-" + lane);
+      const ring = document.getElementById("ring-" + lane);
+      const timer = document.getElementById("timer-" + lane);
+      const stEl = document.getElementById("state-" + lane);
+      const vEl = document.getElementById("veh-" + lane);
+
+      // Reset bulbs
+      bR.className = "bulb r-off";
+      bY.className = "bulb y-off";
+      bG.className = "bulb g-off";
+      box.className = "signal-box";
+
+      let color = "#4e6680";
+      let maxT = 5;
+
+      if (state === "green") {
+        bG.className = "bulb g-on";
+        box.className = "signal-box green-active";
+        color = "#00e676"; maxT = 45;
+        stEl.style.color = "#00e676";
+        stEl.textContent = "GREEN ●";
+      } else if (state === "yellow") {
+        bY.className = "bulb y-on";
+        box.className = "signal-box yellow-active";
+        color = "#ffd600"; maxT = 3;
+        stEl.style.color = "#ffd600";
+        stEl.textContent = "YELLOW ●";
+      } else {
+        bR.className = "bulb r-on";
+        box.className = "signal-box red-active";
+        stEl.style.color = "#ff1744";
+        stEl.textContent = "RED ●";
+      }
+
+      // Ring
+      const pct = timeLeft > 0 ? Math.min(1, timeLeft / maxT) : 0;
+      ring.style.stroke = color;
+      ring.style.strokeDasharray = CIRC;
+      ring.style.strokeDashoffset = CIRC * (1 - pct);
+
+      // Timer value
+      timer.textContent = timeLeft > 0 ? Math.ceil(timeLeft) : "--";
+      timer.style.color = color;
+
+      vEl.textContent = vehCount + " vehicles";
+    }
+
+    function updateLane(lane, stats) {
+      const s = stats || {};
+      const cnt = s.vehicle_count || 0;
+      const dens = Math.round((s.density_ratio || 0) * 100);
+      const q = s.queue_length || 0;
+      const wait = Math.round(s.avg_wait_time || 0);
+      const bar = dens < 40 ? "#00e676" : dens < 75 ? "#ffd600" : "#ff1744";
+
+      document.getElementById("lb-cnt-" + lane).textContent = cnt + " veh";
+      document.getElementById("lb-bar-" + lane).style.width = Math.min(dens, 100) + "%";
+      document.getElementById("lb-bar-" + lane).style.background = bar;
+      document.getElementById("lb-dens-" + lane).textContent = "Density: " + dens + "%";
+      document.getElementById("lb-q-" + lane).textContent = "Queue: " + q;
+      document.getElementById("lb-wait-" + lane).textContent = "Wait: " + wait + "s";
+    }
+
+    function applyState(data) {
+      // Video frame
+      if (data.frame_b64) {
+        const img = document.getElementById("videoFeed");
+        img.src = "data:image/jpeg;base64," + data.frame_b64;
+        img.style.display = "block";
+        document.getElementById("noFeed").style.display = "none";
+      }
+
+      const m = data.metrics || {};
+      const sig = (data.signals && data.signals.signals) || {};
+      const ls = (m.lane_stats) || {};
+
+      const fps = m.fps || m.current_fps || 0;
+      document.getElementById("hFps").textContent = parseFloat(fps).toFixed(1);
+      document.getElementById("camFps").textContent = parseFloat(fps).toFixed(1);
+
+      const veh = m.total_vehicles || m.vehicle_count || 0;
+      document.getElementById("hVeh").textContent = veh;
+
+      // Uptime
+      const sec = Math.floor((Date.now() - startTime) / 1000);
+      document.getElementById("hUptime").textContent =
+        String(Math.floor(sec / 60)).padStart(2, "0") + ":" + String(sec % 60).padStart(2, "0");
+
+      // Signals (two lanes)
+      ["North", "South"].forEach(lane => {
+        const s = sig[lane] || {};
+        const ls2 = ls[lane] || {};
+        updateSignal(lane, s.state || "red", s.time_left || 0, ls2.vehicle_count || 0);
+        updateLane(lane, ls2);
+      });
+
+      // Detection stats
+      const vt = m.vehicle_types || {};
+      document.getElementById("sc-cars").textContent = vt.car || 0;
+      document.getElementById("sc-trucks").textContent = vt.truck || 0;
+      document.getElementById("sc-motos").textContent = vt.motorcycle || 0;
+      document.getElementById("sc-buses").textContent = vt.bus || 0;
+
+      // Alerts
+      const al = data.alerts || [];
+      const el = document.getElementById("alerts");
+      if (!al.length) {
+        el.innerHTML = '<div class="no-alert">✓ No active alerts</div>';
+      } else {
+        el.innerHTML = al.slice(0, 5).map(a => {
+          const cls = { critical: "a-crit", high: "a-high", medium: "a-med", low: "a-low" }[a.severity] || "a-low";
+          return `<div class="alert-item ${cls}"><span>${a.emoji || "⚠"}</span><span>${a.message || a.type}</span></div>`;
+        }).join("");
+      }
+    }
+
+    // ── Polling frame every 67ms (~15fps) ──
+    function pollFrame() {
+      fetch("/api/frame?t=" + Date.now())
+        .then(r => { if (r.ok && r.status !== 204) return r.blob(); })
+        .then(blob => {
+          if (!blob) return;
+          const url = URL.createObjectURL(blob);
+          const img = document.getElementById("videoFeed");
+          img.style.display = "block";
+          document.getElementById("noFeed").style.display = "none";
+          img.onload = () => URL.revokeObjectURL(url);
+          img.src = url;
+        }).catch(() => { });
+    }
+
+    // ── WebSocket ──
+    let ws, wsRetries = 0;
+    function connectWS() {
+      ws = new WebSocket("ws://" + location.host + "/ws");
+      ws.onopen = () => { wsRetries = 0; };
+      ws.onmessage = evt => { try { applyState(JSON.parse(evt.data)); } catch (e) { } };
+      ws.onclose = () => setTimeout(connectWS, wsRetries++ < 5 ? 800 : 2500);
+      ws.onerror = () => ws.close();
+    }
+    connectWS();
+
+    // Poll status when WS unavailable
+    setInterval(() => {
+      if (!ws || ws.readyState !== WebSocket.OPEN) {
+        fetch("/api/status").then(r => r.json()).then(applyState).catch(() => { });
+        pollFrame();
+      }
+    }, 120);
+
+    // Always poll frame
+    setInterval(pollFrame, 67);
+  </script>
+</body>
+
+</html>
