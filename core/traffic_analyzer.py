@@ -240,6 +240,7 @@ class TrafficAnalyzer:
             lane_stats_out[name] = {
                 "vehicle_count":   s.vehicle_count,
                 "density_ratio":   round(s.density_ratio, 3),
+                "congestion_index": round(s.congestion_index, 3),
                 "queue_length":    s.queue_length,
                 "avg_wait_time":   round(s.avg_wait_time, 1),
                 "congestion_level": s.congestion_level,

@@ -92,28 +92,21 @@ class SignalOptimizer:
     
     def compute_green_time(self, stats) -> float:
         """
-        Compute adaptive green time based on physics density & queue length.
+        Compute adaptive green time based on Hackathon Master Formula:
+        Green = min(60, max(10, 2 * N))
         
-        Formula: 
-          - Calculate a density multiplier (0.0 to 1.0)
-          - Scale BASE_GREEN to MAX_GREEN via multiplier
-          - Add minor buffer for large stopped queues
+        Where N is the total heavy-weighted vehicle count.
         """
-        if not stats:
-            return config.MIN_GREEN_TIME
+        # 1. Emergency Vehicle Priority Detection Logic
+        if getattr(stats, 'ambulance_present', False):
+            return 60.0
             
-        ratio = getattr(stats, 'density_ratio', 0.0)
-        queue = getattr(stats, 'queue_length', 0)
+        N = getattr(stats, 'vehicle_count', 0)
         
-        # Scale between base and max using density (clamp ratio up to 0.8 as 'fully dense')
-        effective_density_ratio = min(1.0, ratio / 0.8) if ratio > 0 else 0.0
-        green_time = config.BASE_GREEN_TIME + ((config.MAX_GREEN_TIME - config.BASE_GREEN_TIME) * effective_density_ratio)
+        # 2. Hackathon Core Routing Logic
+        green_time = float(max(10, 2 * N))
         
-        # Minor bump for long queues to assist clearing
-        if queue > 4:
-            green_time += (queue - 4) * 1.5
-            
-        return max(config.MIN_GREEN_TIME, min(config.MAX_GREEN_TIME, green_time))
+        return min(60.0, green_time)
     
     def update(self, lane_stats: Dict) -> Dict[str, SignalState]:
         """

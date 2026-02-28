@@ -26,6 +26,12 @@ class LaneStats:
     person_count:   int   = 0
     ambulance_present: bool = False
     density_ratio:  float = 0.0     # 0.0–1.0 (area occupancy)
+    
+    @property
+    def congestion_index(self) -> float:
+        """CI = min(1, N / 25)"""
+        return min(1.0, float(self.vehicle_count) / 25.0)
+        
     avg_wait_time:  float = 0.0
     max_wait_time:  float = 0.0
     queue_length:   int   = 0       # Number of stopped vehicles

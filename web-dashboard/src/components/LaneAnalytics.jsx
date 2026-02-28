@@ -11,9 +11,10 @@ export default function LaneAnalytics({ laneStats = {} }) {
             <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginTop: '12px' }}>
                 {lanes.map(lane => {
                     const stats = laneStats[lane] || {};
-                    const count = stats.vehicle_count || 0;
-                    const density = Math.round((stats.density_ratio || 0) * 100);
                     const queue = stats.queue_length || 0;
+                    const count = stats.vehicle_count || 0;
+                    const ci_raw = stats.congestion_index;
+                    const density = ci_raw !== undefined ? Math.round(ci_raw * 100) : Math.round((stats.density_ratio || 0) * 100);
                     const wait = Math.round(stats.avg_wait_time || 0);
 
                     let barColor = 'var(--green)';
