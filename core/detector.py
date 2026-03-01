@@ -118,29 +118,45 @@ class Detector:
             # ── Hackathon Ambulance Override Heuristic ──
             # YOLOv8n struggles with ambulances. If it's a large vehicle, scan its pixels.
             if is_vehicle and not is_ambulance and label in ["truck", "bus", "car"]:
-                # Crop the bounding box from the frame
-                crop = frame[y1:y2, x1:x2]
-                if crop.size > 0:
-                    # Convert to HSV to look for bright white bodies & intense red lights
-                    hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
-                    
-                    # White mask (low saturation, high value)
-                    lower_white = np.array([0, 0, 200])
-                    upper_white = np.array([180, 40, 255])
-                    mask_white = cv2.inRange(hsv, lower_white, upper_white)
-                    
-                    # Red mask (flashing lights usually stand out in hue 0-10 or 160-180 with high saturation/value)
-                    mask_red1 = cv2.inRange(hsv, np.array([0, 150, 150]), np.array([10, 255, 255]))
-                    mask_red2 = cv2.inRange(hsv, np.array([160, 150, 150]), np.array([180, 255, 255]))
-                    mask_red = cv2.bitwise_or(mask_red1, mask_red2)
-                    
-                    white_ratio = cv2.countNonZero(mask_white) / (crop.shape[0] * crop.shape[1])
-                    red_ratio = cv2.countNonZero(mask_red) / (crop.shape[0] * crop.shape[1])
-                    
-                    # If it's predominantly white (>20%) and has sharp red peaks (>1%), override it!
-                    if white_ratio > 0.20 and red_ratio > 0.01:
-                        is_ambulance = True
-                        label = "ambulance"
+                box_width = x2 - x1
+                box_height = y2 - y1
+                frame_area = w * h
+                box_area = box_width * box_height
+                
+                # Check for "truck/bus in size" -> either labeled as such, or big enough area
+                is_truck_bus_size = label in ["truck", "bus"] or box_area > (frame_area * 0.05)
+                
+                if is_truck_bus_size:
+                    # Crop the bounding box from the frame
+                    crop = frame[y1:y2, x1:x2]
+                    if crop.size > 0:
+                        # Convert to HSV to look for bright white bodies & intense red/blue lights
+                        hsv = cv2.cvtColor(crop, cv2.COLOR_BGR2HSV)
+                        
+                        # White mask (low saturation, high value)
+                        lower_white = np.array([0, 0, 200])
+                        upper_white = np.array([180, 40, 255])
+                        mask_white = cv2.inRange(hsv, lower_white, upper_white)
+                        
+                        # Red mask (flashing lights usually stand out in hue 0-10 or 160-180 with high saturation/value)
+                        mask_red1 = cv2.inRange(hsv, np.array([0, 150, 150]), np.array([10, 255, 255]))
+                        mask_red2 = cv2.inRange(hsv, np.array([160, 150, 150]), np.array([180, 255, 255]))
+                        mask_red = cv2.bitwise_or(mask_red1, mask_red2)
+                        
+                        # Blue mask (flashing lights usually stand out in hue 100-140)
+                        lower_blue = np.array([100, 150, 150])
+                        upper_blue = np.array([140, 255, 255])
+                        mask_blue = cv2.inRange(hsv, lower_blue, upper_blue)
+                        
+                        crop_area = crop.shape[0] * crop.shape[1]
+                        white_ratio = cv2.countNonZero(mask_white) / crop_area
+                        red_ratio = cv2.countNonZero(mask_red) / crop_area
+                        blue_ratio = cv2.countNonZero(mask_blue) / crop_area
+                        
+                        # If it's predominantly white (>15%) and has EITHER red (>0.2%) OR blue peaks (>0.2%), override it!
+                        if white_ratio > 0.15 and (red_ratio > 0.002 or blue_ratio > 0.002):
+                            is_ambulance = True
+                            label = "ambulance"
                         
             # ──────────────────────────────────────────────
             
