@@ -62,12 +62,24 @@ async def broadcast(state: dict):
     active_websockets -= dead
 
 assets_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web-dashboard", "dist", "assets")
+dist_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web-dashboard", "dist")
 if os.path.exists(assets_path): app.mount("/assets", StaticFiles(directory=assets_path), name="assets")
+
+@app.get("/vite.svg")
+async def serve_vite_svg():
+    svg_path = os.path.join(dist_path, "vite.svg")
+    if os.path.exists(svg_path): return FileResponse(svg_path)
+    return HTMLResponse(status_code=404)
 
 @app.get("/")
 async def index():
-    frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "web-dashboard", "dist", "index.html")
-    if os.path.exists(frontend_path): return FileResponse(frontend_path)
+    frontend_path = os.path.join(dist_path, "index.html")
+    if os.path.exists(frontend_path):
+        resp = FileResponse(frontend_path)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        return resp
     return HTMLResponse("<h1>React Dashboard not built yet.</h1>", status_code=404)
 
 @app.get("/api/frame")
@@ -83,3 +95,14 @@ async def api_incidents():
     if processor:
         return JSONResponse(processor.get_incident_history())
     return JSONResponse([])
+
+from pydantic import BaseModel
+class SwapRequest(BaseModel):
+    mapping: list[int]
+
+@app.post("/api/swap-video")
+async def api_swap_video(req: SwapRequest):
+    if processor:
+        processor.set_quadrant_mapping(req.mapping)
+    return {"status": "ok"}
+

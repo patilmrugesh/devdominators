@@ -44,11 +44,13 @@ class TrafficAnalyzer:
     """
     Analyzes traffic flow, detects accidents, and manages alert system.
     
-    Accident Detection Strategy (Hackathon):
-      Rule-based:
-        1. Vehicle stopped for > STOP_THRESHOLD seconds (possible stall/accident)
-        2. Bounding box overlap (IoU > threshold) between two vehicles (collision)
-        3. Person detected in road lane (pedestrian accident)
+    Accident Detection Strategy — Two-Phase Collision Confirmation:
+      Phase 1: Detect collision event (IoU overlap + close centroids)
+               → record as "pending collision" with timestamp.
+      Phase 2: If BOTH vehicles remain stopped for COLLISION_CONFIRM_TIME
+               seconds (default 8s), confirm as real accident.
+               If either vehicle starts moving, discard the event.
+      Additional: Person detected in vehicle lane → pedestrian accident.
     """
     
     MAX_ALERTS = 20
@@ -63,9 +65,9 @@ class TrafficAnalyzer:
         self.wait_history:    List[Dict] = []
         self.history_window   = 60  # seconds
         
-        # Accident tracking
-        self._stop_counters: Dict[int, float] = {}  # track_id → when_stopped
-        self._accident_cooldown: float = 0.0         # Prevent duplicate alerts
+        # Accident tracking — multi-heuristic collision confirmation
+        self._pending_collisions: Dict = {}            # key → {"timestamp", "lane"}
+        self._accident_cooldown: float = 0.0           # Prevent duplicate alerts
         
         # Session stats
         self.session_start    = time.time()
@@ -160,52 +162,169 @@ class TrafficAnalyzer:
         return new_alerts
     
     def _check_accidents(self, tracks, detections, lane_stats) -> Optional[Alert]:
-        """Rule-based accident detection."""
+        """
+        Multi-heuristic accident detection — aggressive for real crash scenes:
+          1. Two-vehicle IoU overlap → confirm after stop time
+          2. Bounding box edge proximity (near-collision / side impact)
+          3. Stopped vehicle + persons gathering nearby (crash scene)
+          4. Single vehicle stopped abnormally long (stall/crash)
+          5. Pedestrian very close to vehicle (impact)
+        """
         vehicle_tracks = [t for t in tracks if t.is_vehicle]
-        
+        person_dets = [d for d in detections if d.is_person]
+        now = time.time()
+
         if not vehicle_tracks:
+            self._pending_collisions.clear()
             return None
-        
-        # Check 1: Long-stopped vehicles (possible stall or accident)
-        stopped = [t for t in vehicle_tracks
-                   if t.is_stopped and t.wait_time > config.ACCIDENT_STOP_THRESHOLD * 2]
-        
-        # Check 2: Bounding box overlap AND Centroid Distance (Real collision)
+
+        track_map = {t.track_id: t for t in vehicle_tracks}
+
+        # ── Heuristic 1 & 2: Vehicle-to-vehicle collision ─────────────────────
         for i, t1 in enumerate(vehicle_tracks):
             for t2 in vehicle_tracks[i+1:]:
                 iou = self._compute_iou(
                     (t1.x1, t1.y1, t1.x2, t1.y2),
                     (t2.x1, t2.y1, t2.x2, t2.y2)
                 )
-                
-                # In 2D perspective, boxes overlap easily. 
-                # To be a real crash, their physical center-points must be abnormally close.
+
                 dx = t1.cx - t2.cx
                 dy = t1.cy - t2.cy
                 centroid_dist = (dx**2 + dy**2) ** 0.5
-                
-                # Flag accident IF highly overlapped AND centroids are packed < 50px AND vehicles have violently stopped
-                if iou > 0.4 and centroid_dist < 50 and t1.is_stopped and t2.is_stopped:
-                    self.total_accidents += 1
-                    return Alert(
-                        alert_type="accident",
-                        message=f"⚠ COLLISION detected between Vehicle #{t1.track_id} and #{t2.track_id}!",
-                        lane=t1.lane,
-                        severity="critical"
-                    )
-        
-        # Check 3: Person in vehicle lane (potential pedestrian accident)
-        for det in detections:
-            if det.is_person:
-                for track in vehicle_tracks:
-                    if abs(det.cx - track.cx) < 40 and abs(det.cy - track.cy) < 40:
+
+                # Edge proximity: how close the bounding box edges are
+                gap_x = max(0, max(t1.x1, t2.x1) - min(t1.x2, t2.x2))
+                gap_y = max(0, max(t1.y1, t2.y1) - min(t1.y2, t2.y2))
+                edge_dist = (gap_x**2 + gap_y**2) ** 0.5
+
+                # Collision: IoU overlap OR bounding boxes within 30px of each other
+                is_collision = (iou > config.ACCIDENT_OVERLAP_IOU) or (edge_dist < 30 and centroid_dist < 100)
+
+                if is_collision:
+                    pair_key = (min(t1.track_id, t2.track_id),
+                                max(t1.track_id, t2.track_id))
+                    if pair_key not in self._pending_collisions:
+                        self._pending_collisions[pair_key] = {
+                            "timestamp": now,
+                            "lane": t1.lane or t2.lane,
+                            "type": "collision",
+                        }
+
+        # Check pending collisions for stop confirmation
+        expired_keys = []
+        for pair_key, info in list(self._pending_collisions.items()):
+            if info.get("type") != "collision":
+                continue
+            if not isinstance(pair_key, tuple):
+                continue
+            tid1, tid2 = pair_key
+            t1 = track_map.get(tid1)
+            t2 = track_map.get(tid2)
+
+            if t1 is None or t2 is None:
+                expired_keys.append(pair_key)
+                continue
+
+            # Either or both stopped → potential crash aftermath
+            both_stopped = t1.is_stopped and t2.is_stopped
+            one_stopped = t1.is_stopped or t2.is_stopped
+
+            elapsed = now - info["timestamp"]
+
+            # Both stopped for CONFIRM_TIME → definite accident
+            if both_stopped and elapsed >= config.COLLISION_CONFIRM_TIME:
+                self.total_accidents += 1
+                expired_keys.append(pair_key)
+                return Alert(
+                    alert_type="accident",
+                    message=f"⚠ COLLISION CONFIRMED — Vehicle #{tid1} and #{tid2} stopped {elapsed:.0f}s after impact!",
+                    lane=info["lane"],
+                    severity="critical"
+                )
+
+            # One stopped for longer → likely crash (other might be pushed away)
+            if one_stopped and elapsed >= config.COLLISION_CONFIRM_TIME * 1.5:
+                self.total_accidents += 1
+                expired_keys.append(pair_key)
+                stopped_id = tid1 if (t1 and t1.is_stopped) else tid2
+                return Alert(
+                    alert_type="accident",
+                    message=f"⚠ COLLISION — Vehicle #{stopped_id} stopped after impact with #{tid1 if stopped_id != tid1 else tid2}!",
+                    lane=info["lane"],
+                    severity="critical"
+                )
+
+            # Both moving after 15s → false alarm, discard
+            if not one_stopped and elapsed > 15.0:
+                expired_keys.append(pair_key)
+
+        for key in expired_keys:
+            self._pending_collisions.pop(key, None)
+
+        # ── Heuristic 3: Stopped vehicle + persons gathering (crash scene) ────
+        # Real accidents: wreckage not detected by YOLO, but persons gather.
+        for track in vehicle_tracks:
+            if not track.is_stopped or track.wait_time < 3.0:
+                continue
+
+            # Count persons within 150px of this stopped vehicle
+            persons_nearby = 0
+            for p in person_dets:
+                if abs(p.cx - track.cx) < 150 and abs(p.cy - track.cy) < 150:
+                    persons_nearby += 1
+
+            # 2+ persons near a stopped vehicle → potential accident scene
+            if persons_nearby >= 2:
+                scene_key = f"scene_{track.track_id}"
+                if scene_key not in self._pending_collisions:
+                    self._pending_collisions[scene_key] = {
+                        "timestamp": now,
+                        "lane": track.lane,
+                        "type": "scene",
+                    }
+                else:
+                    elapsed = now - self._pending_collisions[scene_key]["timestamp"]
+                    if elapsed >= config.COLLISION_CONFIRM_TIME:
+                        self.total_accidents += 1
+                        self._pending_collisions.pop(scene_key, None)
                         return Alert(
                             alert_type="accident",
-                            message="⚠ PEDESTRIAN in vehicle lane — possible accident!",
+                            message=f"⚠ ACCIDENT SCENE — Vehicle #{track.track_id} stopped, {persons_nearby} persons gathered!",
                             lane=track.lane,
-                            severity="high"
+                            severity="critical"
                         )
-        
+
+        # ── Heuristic 4: Single vehicle stopped abnormally long ───────────────
+        for track in vehicle_tracks:
+            if track.is_stopped and track.wait_time > 10.0:
+                stall_key = f"stall_{track.track_id}"
+                if stall_key not in self._pending_collisions:
+                    self._pending_collisions[stall_key] = {
+                        "timestamp": now,
+                        "lane": track.lane,
+                        "type": "stall",
+                    }
+                elif now - self._pending_collisions[stall_key]["timestamp"] >= config.COLLISION_CONFIRM_TIME:
+                    self.total_accidents += 1
+                    self._pending_collisions.pop(stall_key, None)
+                    return Alert(
+                        alert_type="accident",
+                        message=f"⚠ Vehicle #{track.track_id} stopped for {track.wait_time:.0f}s — possible crash/stall!",
+                        lane=track.lane,
+                        severity="high"
+                    )
+
+        # ── Heuristic 5: Pedestrian very close to vehicle (impact) ────────────
+        for det in person_dets:
+            for track in vehicle_tracks:
+                if abs(det.cx - track.cx) < 50 and abs(det.cy - track.cy) < 50:
+                    return Alert(
+                        alert_type="accident",
+                        message="⚠ PEDESTRIAN in vehicle lane — possible accident!",
+                        lane=track.lane,
+                        severity="high"
+                    )
+
         return None
     
     def _compute_iou(self, box1: Tuple, box2: Tuple) -> float:

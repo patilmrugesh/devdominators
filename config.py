@@ -70,7 +70,8 @@ YELLOW_DURATION    = 3    # Yellow light duration in seconds
 # ─── Emergency / Accident ────────────────────────────────────────────────────
 AMBULANCE_OVERRIDE      = True   # Enable emergency preemption
 ACCIDENT_STOP_THRESHOLD = 4.0   # Seconds a vehicle is stopped before flagged
-ACCIDENT_OVERLAP_IOU    = 0.25  # IoU threshold to flag collision
+ACCIDENT_OVERLAP_IOU    = 0.15  # IoU threshold to flag collision (lower = more sensitive)
+COLLISION_CONFIRM_TIME  = 5.0   # Seconds both vehicles must stay stopped after collision to confirm accident
 
 # ─── Backend Server ───────────────────────────────────────────────────────────
 HOST = "0.0.0.0"

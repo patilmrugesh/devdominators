@@ -44,6 +44,8 @@ class VideoProcessor4Way:
         self._capture_thread_obj: Optional[threading.Thread] = None
         self._inference_thread_obj: Optional[threading.Thread] = None
         
+        self.quadrant_mapping = [0, 1, 2, 3] # Default N, S, E, W
+        
         self.state_lock = threading.Lock()
         self.raw_frame: Optional[np.ndarray] = None
         self.shared_detections: List = []
@@ -111,8 +113,12 @@ class VideoProcessor4Way:
                     ret, f = c.read()
                 frames.append(cv2.resize(f, (qw, qh)))
 
-            top_row = np.hstack((frames[0], frames[1]))
-            bot_row = np.hstack((frames[2], frames[3]))
+            with self.state_lock:
+                q_map = list(self.quadrant_mapping)
+
+            mapped_frames = [frames[q_map[i]] for i in range(4)]
+            top_row = np.hstack((mapped_frames[0], mapped_frames[1]))
+            bot_row = np.hstack((mapped_frames[2], mapped_frames[3]))
             composite = np.vstack((top_row, bot_row))
 
             with self.state_lock:
@@ -142,14 +148,14 @@ class VideoProcessor4Way:
                 
                 person_count = sum(1 for t in current_tracks if t.is_person)
                 
-                # Check for critical alerts from the analyzer
-                critical_alerts = [a for a in self.latest_alerts if a['severity'] == 'critical']
+                # Check for critical/high alerts from the analyzer
+                critical_alerts = [a for a in self.latest_alerts if a['severity'] in ('critical', 'high')]
                 
                 if critical_alerts:
                     for a in critical_alerts:
-                        if "COLLISION" in a["message"]:
+                        if a.get("type") == "accident":
                             incident_type = "accident"
-                            desc = f"Collision anomaly detected in {a['lane'] or 'intersection'}."
+                            desc = a["message"]
                             break
                         elif "AMBULANCE" in a["message"]:
                             incident_type = "ambulance"
@@ -235,3 +241,8 @@ class VideoProcessor4Way:
     def get_incident_history(self) -> List[Dict]:
         with self.state_lock:
             return list(self.incident_history)
+
+    def set_quadrant_mapping(self, mapping: List[int]):
+        if len(mapping) == 4:
+            with self.state_lock:
+                self.quadrant_mapping = mapping
